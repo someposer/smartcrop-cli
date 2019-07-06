@@ -9,7 +9,8 @@
     "smartcrop": "smartcrop-cli.js"
   },
   "files": [
-    "smartcrop-cli.js"
+    "smartcrop-cli.js",
+    "weights"
   ],
   "license": "MIT",
   "repository": {
@@ -24,7 +25,10 @@
     "yargs": "~1.2.1"
   },
   "optionalDependencies": {
-    "opencv": "^6.0.0"
+    "face-api.js": "~0.20.1",
+    "canvas": "~2.5.0",
+    "rollup": "^0.60.0",
+    "@tensorflow/tfjs-node": "~1.2.3"
   },
   "devDependencies": {
     "eslint": "^4.19.1",

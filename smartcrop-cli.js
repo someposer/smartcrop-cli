@@ -39,7 +39,7 @@ var argv = require('yargs')
       config: 'path to a config.json',
       width: 'width of the crop',
       height: 'height of the crop',
-      faceDetection: 'perform faceDetection using opencv',
+      faceDetection: 'perform faceDetection using face-api.js',
       outputFormat: 'image magick output format string',
       quality: 'jpeg quality of the output image',
       '*': 'forwarded as options to smartcrop.js'
@@ -55,10 +55,21 @@ var smartcrop = require('smartcrop-gm');
 var _ = require('underscore');
 
 var cv;
+var faceapi;
+var canvas;
 
 if (argv.faceDetection) {
   try {
-    cv = require('opencv');
+    // Ignore FensorFlow CPU warnings
+    process.env.TF_CPP_MIN_LOG_LEVEL = 2;
+
+    require('@tensorflow/tfjs-node');
+    canvas = require('canvas');
+    faceapi = require('face-api.js');
+    
+    const { Canvas, Image, ImageData } = canvas;
+
+    faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
   } catch (e) {
     console.error(e);
     console.error('skipping faceDetection');
@@ -91,26 +102,28 @@ function resize(result) {
   }
 }
 
-function faceDetect(input, options) {
-  return new Promise(function(resolve, reject) {
-    if (!argv.faceDetection) return resolve(false);
-    cv.readImage(input, function(err, image) {
-      if (err) return reject(err);
-      image.detectObject(cv.FACE_CASCADE, {}, function(err, faces) {
-        if (err) return reject(err);
-        options.boost = faces.map(function(face) {
-          return {
-            x: face.x,
-            y: face.y,
-            width: face.width,
-            height: face.height,
-            weight: 1.0
-          };
-        });
-        resolve(true);
-      });
+async function faceDetect(input, options) {
+  if (!argv.faceDetection) return;
+
+  try {
+    await faceapi.nets.tinyFaceDetector.loadFromDisk('./weights');
+
+    const image = await canvas.loadImage(input);
+    const faces = await faceapi.detectAllFaces(image, new faceapi.TinyFaceDetectorOptions());
+    
+    options.boost = faces.map(function(face) {
+      var box = face.box;
+      return {
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+        weight: 1.0
+      };
     });
-  });
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 function analyse() {
