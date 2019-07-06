@@ -115,15 +115,15 @@ async function faceDetect(input, options) {
     var model;
     switch (argv.model) {
       case 'ssd':
-        await faceapi.nets.ssdMobilenetv1.loadFromDisk('./weights');
+        await faceapi.nets.ssdMobilenetv1.loadFromDisk(__dirname + '/weights');
         model = new faceapi.SsdMobilenetv1Options();
         break;
       case 'mtcnn':
-        await faceapi.nets.mtcnn.loadFromDisk('./weights');
+        await faceapi.nets.mtcnn.loadFromDisk(__dirname + '/weights');
         model = new faceapi.MtcnnOptions();
         break;
       default:
-        await faceapi.nets.tinyFaceDetector.loadFromDisk('./weights');
+        await faceapi.nets.tinyFaceDetector.loadFromDisk(__dirname + '/weights');
         model = new faceapi.TinyFaceDetectorOptions();
         break;
     }
