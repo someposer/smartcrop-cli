@@ -32,14 +32,16 @@ var argv = require('yargs')
       'generate a 100x100 thumbnail from photo.jpg'
     )
     .config('config')
-    .defaults('quality', 90)
-    .defaults('outputFormat', 'jpg')
+    .default('quality', 90)
+    .default('outputFormat', 'jpg')
     .boolean('faceDetection')
+    .choices('model', ['tiny', 'ssd', 'mtcnn']).default('model', 'tiny')
     .describe({
       config: 'path to a config.json',
       width: 'width of the crop',
       height: 'height of the crop',
-      faceDetection: 'perform faceDetection using face-api.js',
+      faceDetection: 'perform face detection using face-api.js',
+      model: 'face detection model',
       outputFormat: 'image magick output format string',
       quality: 'jpeg quality of the output image',
       '*': 'forwarded as options to smartcrop.js'
@@ -54,7 +56,6 @@ var gm = require('gm').subClass({ imageMagick: true });
 var smartcrop = require('smartcrop-gm');
 var _ = require('underscore');
 
-var cv;
 var faceapi;
 var canvas;
 
@@ -63,10 +64,14 @@ if (argv.faceDetection) {
     // Ignore FensorFlow CPU warnings
     process.env.TF_CPP_MIN_LOG_LEVEL = 2;
 
-    require('@tensorflow/tfjs-node');
+    try {
+      require('@tensorflow/tfjs-node');
+    } catch (err) {
+      console.warn("missing tensorflow");
+    }
     canvas = require('canvas');
     faceapi = require('face-api.js');
-    
+  
     const { Canvas, Image, ImageData } = canvas;
 
     faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
@@ -77,7 +82,7 @@ if (argv.faceDetection) {
   }
 }
 
-var options = _.extend({}, argv.config, _.omit(argv, 'config', 'quality', 'faceDetection'));
+var options = _.extend({}, argv.config, _.omit(argv, 'config', 'quality', 'faceDetection', 'model'));
 
 function resize(result) {
   var crop = result.topCrop;
@@ -106,10 +111,24 @@ async function faceDetect(input, options) {
   if (!argv.faceDetection) return;
 
   try {
-    await faceapi.nets.tinyFaceDetector.loadFromDisk('./weights');
-
     const image = await canvas.loadImage(input);
-    const faces = await faceapi.detectAllFaces(image, new faceapi.TinyFaceDetectorOptions());
+    var model;
+    switch (argv.model) {
+      case 'ssd':
+        await faceapi.nets.ssdMobilenetv1.loadFromDisk('./weights');
+        model = new faceapi.SsdMobilenetv1Options();
+        break;
+      case 'mtcnn':
+        await faceapi.nets.mtcnn.loadFromDisk('./weights');
+        model = new faceapi.MtcnnOptions();
+        break;
+      default:
+        await faceapi.nets.tinyFaceDetector.loadFromDisk('./weights');
+        model = new faceapi.TinyFaceDetectorOptions();
+        break;
+    }
+
+    const faces = await faceapi.detectAllFaces(image, model);
     
     options.boost = faces.map(function(face) {
       var box = face.box;
